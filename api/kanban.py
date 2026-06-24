@@ -3,42 +3,58 @@ import json, uuid, time, os
 from pathlib import Path
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/home/hermes/.hermes"))
-KANBAN_DIR = HERMES_HOME / "kanban"
-KANBAN_FILE = KANBAN_DIR / "kanban.json"
 
-DEFAULT_COLUMNS = ["todo", "in-progress", "done"]
+# Try shared volume first, fall back to app-local storage if read-only
+_PRIMARY_DIR = HERMES_HOME / "kanban"
+_FALLBACK_DIR = Path(__file__).resolve().parent.parent / "data" / "kanban"
+
+def _get_kanban_dir() -> Path:
+    """Return writable kanban directory. Try shared volume, fall back to local."""
+    try:
+        _PRIMARY_DIR.mkdir(parents=True, exist_ok=True)
+        test_file = _PRIMARY_DIR / ".write_test"
+        test_file.write_text("ok")
+        test_file.unlink()
+        return _PRIMARY_DIR
+    except (OSError, PermissionError):
+        _FALLBACK_DIR.mkdir(parents=True, exist_ok=True)
+        return _FALLBACK_DIR
+
+def _ensure_file():
+    d = _get_kanban_dir()
+    kanban_file = d / "kanban.json"
+    if not kanban_file.exists():
+        _write_to(d, {"columns": ["todo", "in-progress", "done"], "cards": []})
+
+def _read() -> dict:
+    d = _get_kanban_dir()
+    kanban_file = d / "kanban.json"
+    _ensure_file()
+    try:
+        return json.loads(kanban_file.read_text())
+    except (json.JSONDecodeError, FileNotFoundError):
+        data = {"columns": ["todo", "in-progress", "done"], "cards": []}
+        _write_to(d, data)
+        return data
+
+def _write(data: dict):
+    d = _get_kanban_dir()
+    _write_to(d, data)
+
+def _write_to(d: Path, data: dict):
+    (d / "kanban.json").write_text(json.dumps(data, indent=2))
 
 _COLUMN_LABELS = {
     "todo": "To Do",
     "in-progress": "In Progress",
     "done": "Done",
 }
-
-
-def _ensure_file():
-    KANBAN_DIR.mkdir(parents=True, exist_ok=True)
-    if not KANBAN_FILE.exists():
-        _write({"columns": DEFAULT_COLUMNS, "cards": []})
-
-
-def _read() -> dict:
-    _ensure_file()
-    try:
-        return json.loads(KANBAN_FILE.read_text())
-    except (json.JSONDecodeError, FileNotFoundError):
-        data = {"columns": DEFAULT_COLUMNS, "cards": []}
-        _write(data)
-        return data
-
-
-def _write(data: dict):
-    KANBAN_FILE.write_text(json.dumps(data, indent=2))
-
+DEFAULT_COLUMNS = ["todo", "in-progress", "done"]
 
 def get_kanban():
-    """Return the full kanban board with cards grouped by column."""
     data = _read()
-    grouped = {col: [] for col in data.get("columns", DEFAULT_COLUMNS)}
+    columns = data.get("columns", DEFAULT_COLUMNS)
+    grouped = {col: [] for col in columns}
     for card in data.get("cards", []):
         col = card.get("column", "todo")
         if col in grouped:
@@ -48,12 +64,11 @@ def get_kanban():
     return {
         "columns": [
             {"id": col, "label": _COLUMN_LABELS.get(col, col.capitalize())}
-            for col in data.get("columns", DEFAULT_COLUMNS)
+            for col in columns
         ],
         "cards": data.get("cards", []),
         "grouped": grouped,
     }
-
 
 def create_card(title: str, column: str = "todo", description: str = "") -> dict:
     data = _read()
@@ -71,7 +86,6 @@ def create_card(title: str, column: str = "todo", description: str = "") -> dict
     _write(data)
     return card
 
-
 def update_card(card_id: str, updates: dict) -> dict | None:
     data = _read()
     for card in data.get("cards", []):
@@ -88,7 +102,6 @@ def update_card(card_id: str, updates: dict) -> dict | None:
             _write(data)
             return card
     return None
-
 
 def delete_card(card_id: str) -> bool:
     data = _read()
