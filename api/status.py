@@ -27,20 +27,29 @@ def _get_hermes_version() -> dict:
         "latest_tag": None,
     }
 
-    # Get installed version
-    try:
-        ver_out = subprocess.run(
-            ["/opt/hermes/.venv/bin/hermes", "--version"],
-            capture_output=True, text=True, timeout=5,
-        ).stdout.strip()
-        # "Hermes Agent v0.16.0 (2026.6.5) · upstream 338c0743"
-        import re
-        m = re.search(r'v?(\d+\.\d+\.\d+)\s+\(([^)]+)\)', ver_out)
-        if m:
-            result["version"] = m.group(1)
-            result["date"] = m.group(2)
-    except Exception:
-        pass
+    # Get installed version -- read from .hermes-version.json (written by hermes side)
+    version_file = HERMES_HOME / ".hermes-version.json"
+    if version_file.exists():
+        try:
+            vdata = json.loads(version_file.read_text())
+            result["version"] = vdata.get("version")
+            result["date"] = vdata.get("date")
+        except Exception:
+            pass
+    else:
+        # Fallback: try running hermes --version (only works inside hermes container)
+        try:
+            ver_out = subprocess.run(
+                ["/opt/hermes/.venv/bin/hermes", "--version"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+            import re
+            m = re.search(r'v?(\d+\.\d+\.\d+)\s+\(([^)]+)\)', ver_out)
+            if m:
+                result["version"] = m.group(1)
+                result["date"] = m.group(2)
+        except Exception:
+            pass
 
     # Check latest release from GitHub
     latest_tag = None
