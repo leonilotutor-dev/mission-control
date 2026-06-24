@@ -12,9 +12,9 @@ from pathlib import Path
 
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
-AUTH_DIR = Path(__file__).resolve().parent
-PASSWORD_FILE = AUTH_DIR / ".mc-password"
-SECRET_FILE = AUTH_DIR / ".mc-secret"
+AUTH_DIR = Path(os.environ.get("HERMES_HOME", str(Path(__file__).resolve().parent)))
+PASSWORD_FILE = (AUTH_DIR / "mission-control" / ".mc-password")
+SECRET_FILE = (AUTH_DIR / "mission-control" / ".mc-secret")
 
 # Session lifetime: 24 hours
 SESSION_MAX_AGE = 86400
