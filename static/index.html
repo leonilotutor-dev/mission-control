@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hermes Mission Control</title>
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -32,6 +31,7 @@
       </div>
       <div class="header-right">
         <span id="gateway-indicator" class="indicator">● checking...</span>
+        <span id="hermes-version" class="version-badge">—</span>
         <button id="refresh-btn" onclick="refreshAll()">⟳</button>
         <button id="logout-btn" onclick="logout()">Logout</button>
       </div>
@@ -60,7 +60,8 @@
 
       <!-- Tab Navigation -->
       <nav class="tabs">
-        <button class="tab active" data-tab="cron" onclick="switchTab('cron')">Cron Jobs</button>
+        <button class="tab active" data-tab="kanban" onclick="switchTab('kanban')">Kanban</button>
+        <button class="tab" data-tab="cron" onclick="switchTab('cron')">Cron Jobs</button>
         <button class="tab" data-tab="profiles" onclick="switchTab('profiles')">Profiles</button>
         <button class="tab" data-tab="skills" onclick="switchTab('skills')">Skills</button>
         <button class="tab" data-tab="sessions" onclick="switchTab('sessions')">Sessions</button>
@@ -69,7 +70,8 @@
       </nav>
 
       <!-- Tab Content -->
-      <div class="tab-content" id="tab-cron"></div>
+      <div class="tab-content" id="tab-kanban"></div>
+      <div class="tab-content hidden" id="tab-cron"></div>
       <div class="tab-content hidden" id="tab-profiles"></div>
       <div class="tab-content hidden" id="tab-skills"></div>
       <div class="tab-content hidden" id="tab-sessions"></div>

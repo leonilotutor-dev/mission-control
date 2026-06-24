@@ -3,12 +3,11 @@ const API = '';
 
 let state = {
   authenticated: false,
-  activeTab: 'cron',
+  activeTab: 'kanban',
   logsSource: 'gateway',
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Check auth on load
   const resp = await fetch(`${API}/api/check-auth`);
   const data = await resp.json();
   if (data.authenticated) {
@@ -18,7 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     showLogin();
   }
 
-  // Login form submit
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const password = document.getElementById('password-input').value;
@@ -53,7 +51,6 @@ function showDashboard() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
   refreshAll();
-  // Auto-refresh every 30s
   setInterval(refreshAll, 30000);
 }
 
@@ -69,7 +66,7 @@ async function refreshAll() {
   setTimeout(() => btn.classList.remove('spinning'), 300);
 }
 
-// --- Status Cards ---
+// --- Status Cards + Version Badge ---
 async function refreshStatus() {
   try {
     const resp = await fetch(`${API}/api/status`);
@@ -86,6 +83,30 @@ async function refreshStatus() {
     } else {
       indicator.textContent = '● Gateway ' + (data.gateway || 'offline');
       indicator.className = 'indicator offline';
+    }
+
+    // Hermes version badge
+    const verEl = document.getElementById('hermes-version');
+    if (verEl && data.hermes) {
+      const h = data.hermes;
+      if (h.version) {
+        if (h.up_to_date) {
+          verEl.innerHTML = `v${esc(h.version)} <span class="badge badge-green">✓ Up to date</span>`;
+          verEl.className = 'version-badge';
+        } else if (h.up_to_date === false && h.latest_tag) {
+          verEl.innerHTML = `v${esc(h.version)} <span class="badge badge-yellow">⬆ ${esc(h.latest_tag)}</span>`;
+          verEl.className = 'version-badge';
+        } else if (h.up_to_date === false) {
+          verEl.innerHTML = `v${esc(h.version)} <span class="badge badge-yellow">⬆ Update avail.</span>`;
+          verEl.className = 'version-badge';
+        } else {
+          verEl.textContent = `v${h.version}`;
+          verEl.className = 'version-badge';
+        }
+      } else {
+        verEl.textContent = 'Hermes —';
+        verEl.className = 'version-badge';
+      }
     }
 
     document.getElementById('last-updated').textContent =
@@ -107,6 +128,7 @@ function switchTab(tab) {
 
 async function refreshTab(tab) {
   switch (tab) {
+    case 'kanban': return renderKanban();
     case 'cron': return renderCron();
     case 'profiles': return renderProfiles();
     case 'skills': return renderSkills();
@@ -116,7 +138,117 @@ async function refreshTab(tab) {
   }
 }
 
-// --- Cron ---
+// ─── Kanban ────────────────────────────────────────────────────────────────
+async function renderKanban() {
+  const el = document.getElementById('tab-kanban');
+  try {
+    const resp = await fetch(`${API}/api/kanban`);
+    const data = await resp.json();
+    const columns = data.columns || [];
+    const grouped = data.grouped || {};
+
+    let html = '<div class="kanban-toolbar">';
+    html += '<button class="kanban-add-btn" onclick="kanbanAddCard()">＋ Add Card</button>';
+    html += '</div>';
+    html += '<div class="kanban-board">';
+
+    for (const col of columns) {
+      const cards = grouped[col.id] || [];
+      const colLabel = col.label || col.id;
+      const colorClass = col.id === 'todo' ? 'kanban-col-todo'
+        : col.id === 'in-progress' ? 'kanban-col-progress'
+        : 'kanban-col-done';
+
+      html += `<div class="kanban-column ${colorClass}">`;
+      html += `<div class="kanban-col-header"><span class="kanban-col-title">${esc(colLabel)}</span><span class="kanban-col-count">${cards.length}</span></div>`;
+      html += '<div class="kanban-cards">';
+
+      if (cards.length === 0) {
+        html += '<div class="kanban-empty">No cards</div>';
+      } else {
+        for (const card of cards) {
+          const desc = card.description ? `<div class="kanban-card-desc">${esc(card.description)}</div>` : '';
+          html += `
+            <div class="kanban-card" data-id="${esc(card.id)}">
+              <div class="kanban-card-title" ondblclick="kanbanEditTitle('${esc(card.id)}', this)">${esc(card.title)}</div>
+              ${desc}
+              <div class="kanban-card-actions">
+                ${col.id !== 'todo' ? `<button class="kanban-btn" onclick="kanbanMove('${esc(card.id)}', 'left')">◀</button>` : '<span></span>'}
+                ${col.id !== 'done' ? `<button class="kanban-btn" onclick="kanbanMove('${esc(card.id)}', 'right')">▶</button>` : '<span></span>'}
+                <button class="kanban-btn kanban-btn-del" onclick="kanbanDelete('${esc(card.id)}')">✕</button>
+              </div>
+            </div>`;
+        }
+      }
+
+      html += '</div></div>'; // col cards + column
+    }
+
+    html += '</div>'; // board
+    el.innerHTML = html;
+  } catch (_) {
+    el.innerHTML = '<div class="empty-state"><p>Error loading kanban</p></div>';
+  }
+}
+
+async function kanbanAddCard() {
+  const title = prompt('Card title:');
+  if (!title || !title.trim()) return;
+  const col = prompt('Column (todo / in-progress / done):', 'todo') || 'todo';
+  const desc = prompt('Description (optional):', '') || '';
+  try {
+    await fetch(`${API}/api/kanban`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim(), column: col.trim(), description: desc.trim() }),
+    });
+    renderKanban();
+  } catch (_) {}
+}
+
+async function kanbanEditTitle(cardId, el) {
+  const current = el.textContent;
+  const title = prompt('Edit title:', current);
+  if (!title || !title.trim() || title.trim() === current) return;
+  try {
+    await fetch(`${API}/api/kanban/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim() }),
+    });
+    renderKanban();
+  } catch (_) {}
+}
+
+async function kanbanMove(cardId, dir) {
+  try {
+    const resp = await fetch(`${API}/api/kanban`);
+    const data = await resp.json();
+    const columns = data.columns || [];
+    const card = (data.cards || []).find(c => c.id === cardId);
+    if (!card) return;
+    const colIdx = columns.findIndex(c => c.id === card.column);
+    if (colIdx === -1) return;
+    const targetIdx = dir === 'left' ? colIdx - 1 : colIdx + 1;
+    if (targetIdx < 0 || targetIdx >= columns.length) return;
+    await fetch(`${API}/api/kanban/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ column: columns[targetIdx].id }),
+    });
+    renderKanban();
+  } catch (_) {}
+}
+
+async function kanbanDelete(cardId) {
+  if (!confirm('Delete this card?')) return;
+  try {
+    await fetch(`${API}/api/kanban/${cardId}`, { method: 'DELETE' });
+    renderKanban();
+  } catch (_) {}
+}
+
+// ─── Cron ──────────────────────────────────────────────────────────────────
 async function renderCron() {
   const el = document.getElementById('tab-cron');
   try {
@@ -154,7 +286,7 @@ async function renderCron() {
   }
 }
 
-// --- Profiles ---
+// ─── Profiles ──────────────────────────────────────────────────────────────
 async function renderProfiles() {
   const el = document.getElementById('tab-profiles');
   try {
@@ -185,7 +317,7 @@ async function renderProfiles() {
   }
 }
 
-// --- Skills ---
+// ─── Skills ────────────────────────────────────────────────────────────────
 async function renderSkills() {
   const el = document.getElementById('tab-skills');
   try {
@@ -208,7 +340,7 @@ async function renderSkills() {
   }
 }
 
-// --- Sessions ---
+// ─── Sessions ──────────────────────────────────────────────────────────────
 async function renderSessions() {
   const el = document.getElementById('tab-sessions');
   try {
@@ -241,7 +373,7 @@ async function renderSessions() {
   }
 }
 
-// --- Config ---
+// ─── Config ────────────────────────────────────────────────────────────────
 async function renderConfig() {
   const el = document.getElementById('tab-config');
   try {
@@ -276,7 +408,7 @@ function renderConfigTree(obj, depth = 0) {
   return String(obj);
 }
 
-// --- Logs ---
+// ─── Logs ──────────────────────────────────────────────────────────────────
 async function renderLogs(source) {
   const el = document.getElementById('tab-logs');
   if (source) state.logsSource = source;
@@ -300,7 +432,6 @@ async function renderLogs(source) {
     const size = lines.length;
     el.innerHTML = logTabs + `<div class="log-viewer">${joined}</div>
       <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">${size} lines · last 60 shown</p>`;
-    // Auto-scroll to bottom
     const viewer = el.querySelector('.log-viewer');
     if (viewer) viewer.scrollTop = viewer.scrollHeight;
   } catch (_) {
@@ -308,14 +439,14 @@ async function renderLogs(source) {
   }
 }
 
-// --- Logout ---
+// ─── Logout ────────────────────────────────────────────────────────────────
 async function logout() {
   await fetch(`${API}/api/logout`);
   state.authenticated = false;
   showLogin();
 }
 
-// --- Utils ---
+// ─── Utils ─────────────────────────────────────────────────────────────────
 function esc(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
