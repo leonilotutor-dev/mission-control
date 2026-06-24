@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+.mc-password
+.mc-secret
+.boot.sh
+.DS_Store

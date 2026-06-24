@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Mission Control</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen hidden">
+    <div class="login-card">
+      <div class="login-icon">◈</div>
+      <h1>Hermes Mission Control</h1>
+      <p class="login-subtitle">Authentication required</p>
+      <div id="login-error" class="login-error hidden"></div>
+      <form id="login-form">
+        <input type="password" id="password-input" placeholder="Enter password" autofocus>
+        <button type="submit">Unlock</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="screen hidden">
+    <header>
+      <div class="header-left">
+        <span class="logo">◈</span>
+        <h1>Hermes <span class="accent">Mission Control</span></h1>
+      </div>
+      <div class="header-right">
+        <span id="gateway-indicator" class="indicator">● checking...</span>
+        <button id="refresh-btn" onclick="refreshAll()">⟳</button>
+        <button id="logout-btn" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Stat Cards -->
+      <section class="cards-row">
+        <div class="stat-card" onclick="switchTab('cron')">
+          <div class="stat-value" id="stat-cron">—</div>
+          <div class="stat-label">Cron Jobs</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('profiles')">
+          <div class="stat-value" id="stat-profiles">—</div>
+          <div class="stat-label">Profiles</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('skills')">
+          <div class="stat-value" id="stat-skills">—</div>
+          <div class="stat-label">Skills</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('sessions')">
+          <div class="stat-value" id="stat-sessions">—</div>
+          <div class="stat-label">Sessions (24h)</div>
+        </div>
+      </section>
+
+      <!-- Tab Navigation -->
+      <nav class="tabs">
+        <button class="tab active" data-tab="cron" onclick="switchTab('cron')">Cron Jobs</button>
+        <button class="tab" data-tab="profiles" onclick="switchTab('profiles')">Profiles</button>
+        <button class="tab" data-tab="skills" onclick="switchTab('skills')">Skills</button>
+        <button class="tab" data-tab="sessions" onclick="switchTab('sessions')">Sessions</button>
+        <button class="tab" data-tab="config" onclick="switchTab('config')">Config</button>
+        <button class="tab" data-tab="logs" onclick="switchTab('logs')">Logs</button>
+      </nav>
+
+      <!-- Tab Content -->
+      <div class="tab-content" id="tab-cron"></div>
+      <div class="tab-content hidden" id="tab-profiles"></div>
+      <div class="tab-content hidden" id="tab-skills"></div>
+      <div class="tab-content hidden" id="tab-sessions"></div>
+      <div class="tab-content hidden" id="tab-config"></div>
+      <div class="tab-content hidden" id="tab-logs"></div>
+    </main>
+
+    <footer>
+      <span>Hermes Agent · Read-only Dashboard</span>
+      <span id="last-updated">—</span>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
